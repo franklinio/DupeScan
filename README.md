@@ -1,6 +1,6 @@
 # DupeScan
 
-A CLI tool to find and optionally delete duplicate files in a directory.
+A CLI tool to find and optionally delete duplicate files and folders in a directory.
 
 ## Installation
 
@@ -26,7 +26,7 @@ uv run dupescan /path/to/directory --delete
 
 | Option | Description |
 |--------|-------------|
-| `--delete` | Delete duplicate files, keeping the oldest copy based on modification time |
+| `--delete` | Delete duplicate files and folders, keeping the oldest copy based on modification time |
 | `--help` | Show help message |
 
 ### Example Output
@@ -55,20 +55,31 @@ Deleted 3 file(s), freed 1.5 MB
 
 ## How It Works
 
-DupeScan uses a two-phase approach to efficiently find duplicates:
+DupeScan finds duplicates in two phases:
 
-1. **Group by directory and file size** - Files are first grouped by their parent directory and size. Only files in the same directory with matching sizes are considered potential duplicates. This avoids expensive hash computations for most files.
+### Duplicate Folders
+
+First, DupeScan detects duplicate folders. Two sibling directories (directories with the same parent) are considered duplicates if they contain files with identical names and content. The comparison is shallow—only immediate files are compared, not subdirectories.
+
+When duplicate folders are found, the entire folder is treated as a unit. Deletion removes the entire folder.
+
+### Duplicate Files
+
+After folder duplicates are identified, DupeScan finds duplicate files among the remaining files:
+
+1. **Group by directory and file size** - Files are first grouped by their parent directory and size. Only files in the same directory with matching sizes are considered potential duplicates.
 
 2. **Compare by hash** - For files with matching sizes in the same directory, a SHA-256 hash is computed. Files with identical hashes are true duplicates. Hashing is done in 64KB chunks to handle large files without loading them entirely into memory.
 
-When deleting, DupeScan keeps the file with the oldest modification time and removes all other copies.
+When deleting, DupeScan keeps the file or folder with the oldest modification time and removes all other copies.
 
 ### What Gets Scanned
 
 - Recursively scans all subdirectories
 - Skips symbolic links
 - Skips hidden files and directories (names starting with `.`)
-- Only considers files in the same directory as potential duplicates (files with identical content in different directories are not flagged)
+- Only considers files/folders in the same directory as potential duplicates
+- Empty folders or folders with only subdirectories are not considered for folder duplication
 
 ## Development
 

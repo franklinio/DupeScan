@@ -20,28 +20,56 @@ def format_date(timestamp: float) -> str:
     return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
 
 
-def print_duplicates(duplicate_groups: list[list[tuple[Path, int, float]]], delete_mode: bool = False) -> None:
+def print_duplicates(
+    folder_duplicates: list[list[tuple[Path, int, float]]],
+    file_duplicates: list[list[tuple[Path, int, float]]],
+    delete_mode: bool = False
+) -> None:
     """
-    Print duplicate file groups.
+    Print duplicate folder and file groups.
 
     Args:
-        duplicate_groups: List of groups, each group is a list of (path, size, mtime) tuples
+        folder_duplicates: List of folder groups, each is list of (folder_path, total_size, oldest_mtime)
+        file_duplicates: List of file groups, each is list of (file_path, size, mtime)
         delete_mode: If True, show KEEP/DELETE labels
     """
-    if not duplicate_groups:
-        print("No duplicate files found.")
+    if not folder_duplicates and not file_duplicates:
+        print("No duplicates found.")
         return
 
-    total_dupes = sum(len(group) - 1 for group in duplicate_groups)
-    total_wasted = sum((len(group) - 1) * group[0][1] for group in duplicate_groups)
+    total_folder_dupes = sum(len(group) - 1 for group in folder_duplicates)
+    total_file_dupes = sum(len(group) - 1 for group in file_duplicates)
+    folder_wasted = sum((len(group) - 1) * group[0][1] for group in folder_duplicates)
+    file_wasted = sum((len(group) - 1) * group[0][1] for group in file_duplicates)
 
-    print(f"\nFound {len(duplicate_groups)} set(s) of duplicates:\n")
+    total_sets = len(folder_duplicates) + len(file_duplicates)
+    print(f"\nFound {total_sets} set(s) of duplicates:\n")
 
-    for i, group in enumerate(duplicate_groups, 1):
+    idx = 1
+
+    # Print folder duplicates
+    for group in folder_duplicates:
         size = group[0][1]
-        print(f"[{i}] {len(group)} files ({format_size(size)} each):")
+        print(f"[{idx}] {len(group)} folders ({format_size(size)} each):")
+        idx += 1
 
-        # Sort by mtime (oldest first) for consistent display
+        sorted_group = sorted(group, key=lambda x: x[2])
+
+        for j, (path, _, mtime) in enumerate(sorted_group):
+            date_str = format_date(mtime)
+            if delete_mode:
+                label = "KEEP  " if j == 0 else "DELETE"
+                print(f"    {label} {path}/ ({date_str})")
+            else:
+                print(f"    {path}/")
+        print()
+
+    # Print file duplicates
+    for group in file_duplicates:
+        size = group[0][1]
+        print(f"[{idx}] {len(group)} files ({format_size(size)} each):")
+        idx += 1
+
         sorted_group = sorted(group, key=lambda x: x[2])
 
         for j, (path, _, mtime) in enumerate(sorted_group):
@@ -53,32 +81,65 @@ def print_duplicates(duplicate_groups: list[list[tuple[Path, int, float]]], dele
                 print(f"    {path}")
         print()
 
-    print(f"Total: {total_dupes} duplicate file(s) ({format_size(total_wasted)} wasted)")
+    # Summary
+    parts = []
+    if total_folder_dupes:
+        parts.append(f"{total_folder_dupes} duplicate folder(s)")
+    if total_file_dupes:
+        parts.append(f"{total_file_dupes} duplicate file(s)")
+    total_wasted = folder_wasted + file_wasted
+    print(f"Total: {', '.join(parts)} ({format_size(total_wasted)} wasted)")
 
 
-def get_files_to_delete(duplicate_groups: list[list[tuple[Path, int, float]]]) -> list[tuple[Path, int]]:
+def get_files_to_delete(
+    folder_duplicates: list[list[tuple[Path, int, float]]],
+    file_duplicates: list[list[tuple[Path, int, float]]]
+) -> tuple[list[tuple[Path, int]], list[tuple[Path, int]]]:
     """
-    Get list of files to delete (all except oldest in each group).
+    Get lists of files and folders to delete (all except oldest in each group).
+
+    Args:
+        folder_duplicates: List of folder duplicate groups
+        file_duplicates: List of file duplicate groups
 
     Returns:
-        List of (path, size) tuples for files to delete
+        Tuple of (files_to_delete, folders_to_delete), each is list of (path, size)
     """
-    to_delete = []
+    files_to_delete = []
+    folders_to_delete = []
 
-    for group in duplicate_groups:
-        # Sort by mtime, oldest first
+    # Get folders to delete
+    for group in folder_duplicates:
         sorted_group = sorted(group, key=lambda x: x[2])
-        # Skip the first (oldest), mark rest for deletion
         for path, size, _ in sorted_group[1:]:
-            to_delete.append((path, size))
+            folders_to_delete.append((path, size))
 
-    return to_delete
+    # Get files to delete
+    for group in file_duplicates:
+        sorted_group = sorted(group, key=lambda x: x[2])
+        for path, size, _ in sorted_group[1:]:
+            files_to_delete.append((path, size))
+
+    return files_to_delete, folders_to_delete
 
 
-def confirm_delete(files_to_delete: list[tuple[Path, int]]) -> bool:
+def confirm_delete(
+    files_to_delete: list[tuple[Path, int]],
+    folders_to_delete: list[tuple[Path, int]] | None = None
+) -> bool:
     """Prompt user to confirm deletion."""
-    total_size = sum(size for _, size in files_to_delete)
-    print(f"\nDelete {len(files_to_delete)} file(s) ({format_size(total_size)})? [y/N]: ", end="")
+    folders_to_delete = folders_to_delete or []
+    file_size = sum(size for _, size in files_to_delete)
+    folder_size = sum(size for _, size in folders_to_delete)
+    total_size = file_size + folder_size
+
+    parts = []
+    if folders_to_delete:
+        parts.append(f"{len(folders_to_delete)} folder(s)")
+    if files_to_delete:
+        parts.append(f"{len(files_to_delete)} file(s)")
+
+    print(f"\nDelete {', '.join(parts)} ({format_size(total_size)})? [y/N]: ", end="")
 
     try:
         response = input().strip().lower()
