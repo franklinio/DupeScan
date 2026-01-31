@@ -38,13 +38,13 @@ Found 1247 files, checking for duplicates...
 Found 2 set(s) of duplicates:
 
 [1] 2 files (1.5 MB each):
-    KEEP   /path/to/photo.jpg (2023-01-15)
-    DELETE /path/to/backup/photo.jpg (2024-06-20)
+    KEEP   /path/to/photos/photo.jpg (2023-01-15)
+    DELETE /path/to/photos/photo_copy.jpg (2024-06-20)
 
 [2] 3 files (24.0 KB each):
-    KEEP   /path/to/doc.pdf (2022-03-10)
-    DELETE /path/to/old/doc.pdf (2023-08-01)
-    DELETE /path/to/archive/doc.pdf (2024-01-05)
+    KEEP   /path/to/docs/report.pdf (2022-03-10)
+    DELETE /path/to/docs/report_v2.pdf (2023-08-01)
+    DELETE /path/to/docs/report_final.pdf (2024-01-05)
 
 Total: 3 duplicate file(s) (1.5 MB wasted)
 
@@ -57,9 +57,9 @@ Deleted 3 file(s), freed 1.5 MB
 
 DupeScan uses a two-phase approach to efficiently find duplicates:
 
-1. **Group by file size** - Files are first grouped by their size. Files with unique sizes are skipped immediately since they cannot have duplicates. This avoids expensive hash computations for most files.
+1. **Group by directory and file size** - Files are first grouped by their parent directory and size. Only files in the same directory with matching sizes are considered potential duplicates. This avoids expensive hash computations for most files.
 
-2. **Compare by hash** - For files with matching sizes, a SHA-256 hash is computed. Files with identical hashes are true duplicates. Hashing is done in 64KB chunks to handle large files without loading them entirely into memory.
+2. **Compare by hash** - For files with matching sizes in the same directory, a SHA-256 hash is computed. Files with identical hashes are true duplicates. Hashing is done in 64KB chunks to handle large files without loading them entirely into memory.
 
 When deleting, DupeScan keeps the file with the oldest modification time and removes all other copies.
 
@@ -68,6 +68,7 @@ When deleting, DupeScan keeps the file with the oldest modification time and rem
 - Recursively scans all subdirectories
 - Skips symbolic links
 - Skips hidden files and directories (names starting with `.`)
+- Only considers files in the same directory as potential duplicates (files with identical content in different directories are not flagged)
 
 ## Development
 

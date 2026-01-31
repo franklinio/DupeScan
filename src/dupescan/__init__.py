@@ -15,21 +15,24 @@ def find_duplicates(files: list[FileInfo]) -> list[list[tuple[Path, int, float]]
     """
     Find duplicate files using size grouping and hash comparison.
 
+    Only files in the same directory are considered potential duplicates.
+
     Returns:
         List of duplicate groups, each group is a list of (path, size, mtime) tuples
     """
-    # Phase 1: Group by size
-    size_groups: dict[int, list[FileInfo]] = defaultdict(list)
+    # Phase 1: Group by (directory, size)
+    dir_size_groups: dict[tuple[Path, int], list[FileInfo]] = defaultdict(list)
     for file_info in files:
-        size_groups[file_info.size].append(file_info)
+        key = (file_info.path.parent, file_info.size)
+        dir_size_groups[key].append(file_info)
 
     # Filter to only groups with potential duplicates (size > 0 and count > 1)
     potential_dupes = [
-        group for size, group in size_groups.items()
+        group for (_, size), group in dir_size_groups.items()
         if size > 0 and len(group) > 1
     ]
 
-    # Phase 2: Hash comparison
+    # Phase 2: Hash comparison (still grouped by directory from phase 1)
     duplicate_groups = []
 
     for group in potential_dupes:

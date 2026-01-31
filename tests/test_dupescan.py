@@ -126,3 +126,13 @@ class TestFindDuplicates:
         duplicates = find_duplicates(files)
 
         assert len(duplicates) == 0
+
+    def test_same_content_different_dirs_not_duplicates(self, tmp_path):
+        (tmp_path / "file1.txt").write_text("same")
+        (tmp_path / "subdir").mkdir()
+        (tmp_path / "subdir" / "file2.txt").write_text("same")
+
+        files = scan_directory(tmp_path)
+        duplicates = find_duplicates(files)
+
+        assert len(duplicates) == 0  # Not duplicates - different directories
